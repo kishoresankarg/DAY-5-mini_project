@@ -587,13 +587,17 @@ router.get("/:id", async (req, res) => {
  *       200:
  *         description: Product added to cart
  */
-router.post("/cart/add", auth, async (req, res) => {
+router.post("/cart/add", async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
-    const userId = req.user.id;
+    const { productId, quantity, userId: bodyUserId } = req.body;
+    const userId = (req.user && req.user.id) || bodyUserId || req.query.userId;
 
     if (!productId || !quantity) {
       return res.status(400).json({ message: "Product ID and quantity are required" });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required (provide token or userId)" });
     }
 
     const product = await Product.findById(productId);
@@ -620,12 +624,16 @@ router.post("/cart/add", auth, async (req, res) => {
 });
 
 // Delete from Cart
-router.delete("/cart/delete/:productId", auth, async (req, res) => {
+router.delete("/cart/delete/:productId", async (req, res) => {
   try {
-    const userId = req.user.id;
     const { productId } = req.params;
+    const userId = (req.user && req.user.id) || req.body.userId || req.query.userId;
 
-    const user = await User.findByIdAndUpdate(
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required (provide token or userId)" });
+    }
+
+    await User.findByIdAndUpdate(
       userId,
       { $pull: { cart: { productId } } },
       { new: true }
@@ -656,9 +664,14 @@ router.delete("/cart/delete/:productId", auth, async (req, res) => {
  *       200:
  *         description: User cart
  */
-router.get("/cart", auth, async (req, res) => {
+router.get("/cart", async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = (req.user && req.user.id) || req.query.userId || req.body.userId;
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required (provide token or userId)" });
+    }
+
     const user = await User.findById(userId).select("cart").populate("cart.productId", "name price category stock description");
 
     if (!user) {
